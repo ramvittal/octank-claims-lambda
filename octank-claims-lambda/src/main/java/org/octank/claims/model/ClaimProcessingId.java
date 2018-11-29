@@ -1,5 +1,5 @@
 package org.octank.claims.model;
-// Generated Nov 26, 2018 8:17:52 PM by Hibernate Tools 5.2.11.Final
+// Generated Nov 28, 2018 2:11:05 PM by Hibernate Tools 5.2.11.Final
 
 import java.util.Date;
 import javax.persistence.Column;

@@ -59,9 +59,11 @@ public class ClaimsProcessingHandler implements RequestHandler<Request, String> 
 		           
 		           cp.setId(cpi);
 		           cp.setClaimStatus("Denied");
+		           String claimIdSt = claim.getClaimId() +"~" + claim.getClaimStatus();
+		           
 		           session.save(cp);
-		           claimsSb = claimsSb.length() > 0 ? claimsSb.append("," + claim.getClaimId()) : claimsSb.append(claim.getClaimId());
-		           System.out.println(claimsSb.toString() + "***Processed");
+		           claimsSb = claimsSb.length() > 0 ? claimsSb.append("," + claimIdSt) : claimsSb.append(claimIdSt);
+		           System.out.println("**** Processed claims: " +claimsSb.toString() + "***End");
 		           
 		      }
 	         
