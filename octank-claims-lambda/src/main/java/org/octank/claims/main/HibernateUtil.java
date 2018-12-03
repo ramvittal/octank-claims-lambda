@@ -10,6 +10,10 @@ import org.hibernate.service.ServiceRegistry;
 import org.octank.claims.model.Claim;
 import org.octank.claims.model.ClaimProcessing;
 import org.octank.claims.model.ClaimProcessingId;
+import org.octank.claims.model.InsuranceCompany;
+import org.octank.claims.model.InsurancePolicy;
+import org.octank.claims.model.MedicalProvider;
+import org.octank.claims.model.Patient;
 import org.octank.claims.model.Staff;
 
 //import com.fasterxml.classmate.AnnotationConfiguration;
@@ -32,6 +36,10 @@ public class HibernateUtil {
         configuration.addAnnotatedClass(ClaimProcessingId.class);
         configuration.addAnnotatedClass(Staff.class);
         configuration.addAnnotatedClass(Claim.class);
+        configuration.addAnnotatedClass(Patient.class);
+        configuration.addAnnotatedClass(InsurancePolicy.class);
+        configuration.addAnnotatedClass(InsuranceCompany.class);
+        configuration.addAnnotatedClass(MedicalProvider.class);
        
        
         ServiceRegistry serviceRegistry = new StandardServiceRegistryBuilder().applySettings(configuration.getProperties()).build();

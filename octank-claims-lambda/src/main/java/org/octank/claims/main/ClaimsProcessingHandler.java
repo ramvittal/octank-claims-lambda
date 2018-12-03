@@ -4,7 +4,10 @@ package org.octank.claims.main;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
@@ -18,6 +21,12 @@ import org.hibernate.query.Query;
 import org.octank.claims.model.Claim;
 import org.octank.claims.model.ClaimProcessing;
 import org.octank.claims.model.ClaimProcessingId;
+import org.octank.claims.model.InsuranceCompany;
+import org.octank.claims.model.InsurancePolicy;
+import org.octank.claims.model.Log;
+import org.octank.claims.model.MedicalProvider;
+import org.octank.claims.model.Patient;
+import org.octank.claims.model.Staff;
 
 /**
  * @author rvvittal
@@ -29,8 +38,11 @@ public class ClaimsProcessingHandler implements RequestHandler<Request, String> 
     	
         SessionFactory sessionFactory = HibernateUtil.getSessionFactory();
         StringBuilder claimsSb = new StringBuilder();
+        Session session=null;
         
-        try (Session session = sessionFactory.openSession()) {
+        try  {
+        	
+        	session = sessionFactory.openSession();
         	
             session.beginTransaction();
             
@@ -51,25 +63,107 @@ public class ClaimsProcessingHandler implements RequestHandler<Request, String> 
 	         //2. for each submitted claim, perform edits, create ClaimProcessing record, update oracle claim status, and send log record to elastic search
 	         
 	         for (Claim claim : claims) {
-		           ClaimProcessing cp = new ClaimProcessing();
+		           
+	        	 ClaimProcessing cp = new ClaimProcessing();
 		           ClaimProcessingId cpi = new ClaimProcessingId();
 		           
 		           cpi.setClaimId(claim.getClaimId());
 		           cpi.setClaimProcessDate(new Date());
 		           
 		           cp.setId(cpi);
-		           cp.setClaimStatus("Denied");
-		           String claimIdSt = claim.getClaimId() +"~" + claim.getClaimStatus();
+		           cp.setAmountClaimed(claim.getAmountClaimed());
+		           
+		           
+		           //setup claim processing object
+		           
+		           Patient patient = session.load(Patient.class, claim.getPatientId());
+		           
+		           cp.setPatientName(patient.getPatientName());
+		           cp.setPatientGender(patient.getGender());
+		           
+		           InsuranceCompany insuranceCo = session.load(InsuranceCompany.class, claim.getInsuranceCompanyId());
+		           cp.setInsuranceCompanyName(insuranceCo.getInsuranceCompanyName());
+		           
+		           MedicalProvider mp = session.load(MedicalProvider.class, claim.getMedicalProviderId());
+		           cp.setMedicalProviderName(mp.getMedicalProviderName());
+		           
+		           Staff staff = session.load(Staff.class, claim.getStaffId());;
+		           cp.setPhysicianName(staff.getStaffName());
+		           
+		           //perform pre-edits, check patient info for completeness
+		           
+		           if(patient.getPatientAddress().isEmpty()) {
+		        	   cp.setClaimStatus("Incomplete");
+		           }
+		           
+		           //perform adjudication
+		           
+		           InsurancePolicy insurancePolicy = session.load(InsurancePolicy.class, claim.getInsurancePolicyNbr());
+		           
+		           if(!patient.getGender().equals(insurancePolicy.getInsuredGender())) {
+		        	   cp.setClaimStatus("Rejected");
+		           } else if (claim.getAmountClaimed().doubleValue() > insurancePolicy.getInsuredAmount().doubleValue()) {
+		        	   cp.setClaimStatus("Denied");
+		           } else {
+		        	   cp.setClaimStatus("Approved");
+		           }
+		           
+		           
+		           
+		           
+		           String claimIdSt = claim.getClaimId() +"~" + cp.getClaimStatus();
 		           
 		           session.save(cp);
 		           claimsSb = claimsSb.length() > 0 ? claimsSb.append("," + claimIdSt) : claimsSb.append(claimIdSt);
-		           System.out.println("**** Processed claims: " +claimsSb.toString() + "***End");
+		           //System.out.println("**** Processed claims: " +claimsSb.toString() + "***End");
+		           
+		           ObjectMapper mapper = new ObjectMapper();
+		            
+		            Log log = new Log();
+		            
+		            log.setEventType("ProcessClaim");
+		            log.setEventTmst(new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()));
+		            log.setObjectType("ClaimProcessing");
+		            log.setLevel("INFO");
+		            log.setContext("Processed Claim");
+		            log.setObject(cp);
+
+					String jsonLog = mapper.writeValueAsString(log);
+					System.out.println(jsonLog);
 		           
 		      }
 	         
 	         
 	         
             session.getTransaction().commit();
+        }
+        catch(Exception e) {
+        	e.printStackTrace(System.out);
+        	 ObjectMapper mapper = new ObjectMapper();
+	            
+	            Log log = new Log();
+	            
+	            log.setEventType("ProcessClaim");
+	            log.setEventTmst(new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()));
+	            log.setObjectType("ClaimProcessing");
+	            log.setContext(e.getMessage());
+	            log.setLevel("ERROR");
+	            log.setObject(request);
+
+				
+				try {
+					String jsonLog = mapper.writeValueAsString(log);
+					System.out.println(jsonLog);
+				} catch (JsonProcessingException e1) {
+					e1.printStackTrace(System.out);
+				}
+				
+        	
+        }
+        finally {
+        	if(session != null) {
+				session.close();
+			}
         }
 
         return claimsSb.toString();
