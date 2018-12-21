@@ -92,22 +92,23 @@ public class ClaimsProcessingHandler implements RequestHandler<Request, String> 
 		           
 		           //perform pre-edits, check patient info for completeness
 		           
-		           if(patient.getPatientAddress().isEmpty()) {
+		           if(patient.getPatientAddress() == null || patient.getPatientAddress().isEmpty()) {
 		        	   cp.setClaimStatus("Incomplete");
-		           }
-		           
-		           //perform adjudication
-		           
-		           InsurancePolicy insurancePolicy = session.load(InsurancePolicy.class, claim.getInsurancePolicyNbr());
-		           
-		           if(!patient.getGender().equals(insurancePolicy.getInsuredGender())) {
-		        	   cp.setClaimStatus("Rejected");
-		           } else if (claim.getAmountClaimed().doubleValue() > insurancePolicy.getInsuredAmount().doubleValue()) {
-		        	   cp.setClaimStatus("Denied");
 		           } else {
-		        	   cp.setClaimStatus("Approved");
-		           }
 		           
+			           //perform adjudication
+			           
+			           InsurancePolicy insurancePolicy = session.load(InsurancePolicy.class, claim.getInsurancePolicyNbr());
+			           
+			           if(!patient.getGender().equals(insurancePolicy.getInsuredGender())) {
+			        	   cp.setClaimStatus("Rejected");
+			           } else if (claim.getAmountClaimed().doubleValue() > insurancePolicy.getInsuredAmount().doubleValue()) {
+			        	   cp.setClaimStatus("Denied");
+			           } else {
+			        	   cp.setClaimStatus("Approved");
+			           }
+			           
+		           }
 		           
 		           
 		           
